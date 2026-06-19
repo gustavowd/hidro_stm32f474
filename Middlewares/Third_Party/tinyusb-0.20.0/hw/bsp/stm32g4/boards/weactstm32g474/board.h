@@ -127,44 +127,70 @@ static inline void board_clock_init(void)
 // to rework and solder the B0 chip. Note: SB17 may need to be soldered as well (check user manual)
 static inline void board_clock_init(void)
 {
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
-  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-  {
-    //Error_Handler();
-  }
+	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+	RCC_CRSInitTypeDef pInit = {0};
 
-  /* Enable HSI48 */
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  memset(&RCC_OscInitStruct, 0, sizeof(RCC_OscInitStruct));
+	/** Configure the main internal regulator output voltage
+	*/
+	HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1_BOOST);
 
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48;
-  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  HAL_RCC_OscConfig(&RCC_OscInitStruct);
+	/** Initializes the RCC Oscillators according to the specified parameters
+	* in the RCC_OscInitTypeDef structure.
+	*/
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_HSE;
+	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+	RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+	RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV2;
+	RCC_OscInitStruct.PLL.PLLN = 85;
+	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+	RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+	{
+		//Error_Handler();
+	}
 
-  /*Enable CRS Clock*/
-  RCC_CRSInitTypeDef RCC_CRSInitStruct= {0};
-  __HAL_RCC_CRS_CLK_ENABLE();
+	/** Initializes the CPU, AHB and APB buses clocks
+	*/
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+							  |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  /* Default Synchro Signal division factor (not divided) */
-  RCC_CRSInitStruct.Prescaler = RCC_CRS_SYNC_DIV1;
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+	{
+		//Error_Handler();
+	}
 
-  /* Set the SYNCSRC[1:0] bits according to CRS_Source value */
-  RCC_CRSInitStruct.Source = RCC_CRS_SYNC_SOURCE_USB;
+	/** Enable the SYSCFG APB clock
+	*/
+	__HAL_RCC_CRS_CLK_ENABLE();
 
-  /* HSI48 is synchronized with USB SOF at 1KHz rate */
-  RCC_CRSInitStruct.ReloadValue =  __HAL_RCC_CRS_RELOADVALUE_CALCULATE(48000000, 1000);
-  RCC_CRSInitStruct.ErrorLimitValue = RCC_CRS_ERRORLIMIT_DEFAULT;
+	/** Configures CRS
+	*/
+	pInit.Prescaler = RCC_CRS_SYNC_DIV1;
+	pInit.Source = RCC_CRS_SYNC_SOURCE_USB;
+	pInit.Polarity = RCC_CRS_SYNC_POLARITY_RISING;
+	pInit.ReloadValue = __HAL_RCC_CRS_RELOADVALUE_CALCULATE(48000000,1000);
+	pInit.ErrorLimitValue = 34;
+	pInit.HSI48CalibrationValue = 32;
 
-  /* Set the TRIM[5:0] to the default value */
-  RCC_CRSInitStruct.HSI48CalibrationValue = RCC_CRS_HSI48CALIBRATION_DEFAULT;
+	HAL_RCCEx_CRSConfig(&pInit);
 
-  /* Start automatic synchronization */
-  HAL_RCCEx_CRSConfig(&RCC_CRSInitStruct);
-
+	RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
+	PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
+	if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+	{
+	//Error_Handler();
+	}
 }
+
 #endif
 
 static inline void board_vbus_sense_init(void)

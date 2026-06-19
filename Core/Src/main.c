@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "usb_cdc.h"
 #include "tusb.h"
+#include "bsp/board_api.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -83,10 +84,10 @@ int main(void)
   /* USER CODE END Init */
 
   /* Configure the system clock */
-  SystemClock_Config();
+  //SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  board_init();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
