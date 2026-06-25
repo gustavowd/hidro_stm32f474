@@ -46,6 +46,21 @@ void USB_HP_IRQHandler(void) {
   tud_int_handler(0);
 }
 
+// USB PD
+void UCPD1_IRQHandler(void) {
+  tuc_int_handler(0);
+}
+
+void WWDG_IRQHandler(void){
+	while(1){
+		__asm("NOP");
+	}
+}
+
+void USBWakeUp_IRQHandler(void){
+	tuc_int_handler(0);
+}
+
 //--------------------------------------------------------------------+
 // MACRO TYPEDEF CONSTANT ENUM
 //--------------------------------------------------------------------+
@@ -59,7 +74,6 @@ void board_init(void) {
 
   // Enable All GPIOs clocks
   __HAL_RCC_GPIOA_CLK_ENABLE();
-#if 0
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -67,7 +81,6 @@ void board_init(void) {
 
   __HAL_RCC_SYSCFG_CLK_ENABLE();
   __HAL_RCC_PWR_CLK_ENABLE();
-#endif
 
 #if CFG_TUSB_OS == OPT_OS_NONE
   // 1ms tick timer
