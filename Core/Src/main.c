@@ -35,7 +35,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define USBD_STACK_SIZE    (3*configMINIMAL_STACK_SIZE/2) * (CFG_TUSB_DEBUG ? 2 : 1)
-#define CDC_STACK_SZIE      3*configMINIMAL_STACK_SIZE
+#define CDC_STACK_SZIE      2048//3*configMINIMAL_STACK_SIZE
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/

@@ -10,6 +10,10 @@
 #include "cmsis_os.h"
 #include "tusb.h"
 
+#include "pb_encode.h"
+#include "cobs.h"
+#include "dados.pb.h"
+
 SemaphoreHandle_t cdc_tx_sem;
 QueueHandle_t	  cdc_rx_queue;
 
@@ -105,13 +109,53 @@ uint32_t tud_cdc_receive(uint8_t *buffer, uint32_t bufsize, TickType_t timeout){
 	return count;
 }
 
+// Tamanho do Protobuf (calculado automaticamente pela Nanopb)
+#define BUFFER_PROTOBUF_SIZE   BlocoDados_size
+
+// Tamanho do COBS aplicando a fórmula do pior cenário + 1 byte do 0x00 final
+#define BUFFER_COBS_SIZE       (BUFFER_PROTOBUF_SIZE + (BUFFER_PROTOBUF_SIZE / 254))
+
+uint8_t buffer_protobuf[BUFFER_PROTOBUF_SIZE];
+uint8_t buffer_cobs[BUFFER_COBS_SIZE];
+void enviar_dados_massivos(uint32_t idx) {
+    BlocoDados mensagem = BlocoDados_init_zero;
+    mensagem.timestamp = xTaskGetTickCount();
+    mensagem.id_bloco = idx;
+    mensagem.leituras[0] = 1.0f;
+    mensagem.leituras[1] = 2.0f;
+    mensagem.leituras[2] = 3.0f;
+    mensagem.leituras[3] = 4.0f;
+    mensagem.leituras[4] = 5.0f;
+    mensagem.leituras[5] = 6.0f;
+    mensagem.leituras[6] = 7.0f;
+    mensagem.leituras[7] = 8.0f;
+    mensagem.leituras[8] = 9.0f;
+    mensagem.leituras[9] = 10.0f;
+    mensagem.leituras_count = 10;
+
+    pb_ostream_t stream = pb_ostream_from_buffer(buffer_protobuf, sizeof(buffer_protobuf));
+    if (pb_encode(&stream, BlocoDados_fields, &mensagem)) {
+        size_t tamanho_protobuf = stream.bytes_written;
+
+        // Codifica com COBS (garante que não haverá 0x00 nos dados)
+        size_t tamanho_cobs = cobs_encode(buffer_protobuf, tamanho_protobuf, buffer_cobs);
+
+        // Adiciona o marcador de fim de pacote
+        buffer_cobs[tamanho_cobs] = 0x00;
+        tamanho_cobs++;
+
+        // Envia pela Serial/UART (Ex: HAL_UART_Transmit, Serial.write...)
+        tud_cdc_send(buffer_cobs, tamanho_cobs, portMAX_DELAY);
+    }
+}
 //--------------------------------------------------------------------+
 // USB CDC
 //--------------------------------------------------------------------+
 void cdc_task(void* params)
 {
   (void) params;
-  uint8_t buffer[16];
+  //uint8_t buffer[16];
+  uint32_t idx = 0;
   cdc_rx_queue = xQueueCreate(8, sizeof(uint32_t));
   cdc_tx_sem = xSemaphoreCreateBinary();
 
@@ -122,6 +166,7 @@ void cdc_task(void* params)
   // RTOS forever loop
   while ( 1 )
   {
+#if 0
 		/* This implementation reads a single character at a time.  Wait in the
 		Blocked state until a character is received. */
 		// read
@@ -131,6 +176,9 @@ void cdc_task(void* params)
 		if (count){
 			tud_cdc_send(buffer, count, portMAX_DELAY);
 		}
+#endif
+		enviar_dados_massivos(idx++);
+		vTaskDelay(1000);
   }
 }
 
