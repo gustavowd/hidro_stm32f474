@@ -110,7 +110,7 @@ uint32_t tud_cdc_receive(uint8_t *buffer, uint32_t bufsize, TickType_t timeout){
 }
 
 // Tamanho do Protobuf (calculado automaticamente pela Nanopb)
-#define BUFFER_PROTOBUF_SIZE   BlocoDados_size
+#define BUFFER_PROTOBUF_SIZE   MensagemSerial_size
 
 // Tamanho do COBS aplicando a fórmula do pior cenário + 1 byte do 0x00 final
 #define BUFFER_COBS_SIZE       (BUFFER_PROTOBUF_SIZE + (BUFFER_PROTOBUF_SIZE / 254))
@@ -118,23 +118,51 @@ uint32_t tud_cdc_receive(uint8_t *buffer, uint32_t bufsize, TickType_t timeout){
 uint8_t buffer_protobuf[BUFFER_PROTOBUF_SIZE];
 uint8_t buffer_cobs[BUFFER_COBS_SIZE];
 void enviar_dados_massivos(uint32_t idx) {
-    BlocoDados mensagem = BlocoDados_init_zero;
-    mensagem.timestamp = xTaskGetTickCount();
-    mensagem.id_bloco = idx;
-    mensagem.leituras[0] = 1.0f;
-    mensagem.leituras[1] = 2.0f;
-    mensagem.leituras[2] = 3.0f;
-    mensagem.leituras[3] = 4.0f;
-    mensagem.leituras[4] = 5.0f;
-    mensagem.leituras[5] = 6.0f;
-    mensagem.leituras[6] = 7.0f;
-    mensagem.leituras[7] = 8.0f;
-    mensagem.leituras[8] = 9.0f;
-    mensagem.leituras[9] = 10.0f;
-    mensagem.leituras_count = 10;
+	MensagemSerial envelope = MensagemSerial_init_zero;
+
+	envelope.which_conteudo = MensagemSerial_bloco_dados_tag;
+
+	envelope.conteudo.bloco_dados.timestamp = xTaskGetTickCount();
+	envelope.conteudo.bloco_dados.id_bloco = idx;
+	envelope.conteudo.bloco_dados.leituras[0] = 1.0f;
+	envelope.conteudo.bloco_dados.leituras[1] = 2.0f;
+	envelope.conteudo.bloco_dados.leituras[2] = 3.0f;
+	envelope.conteudo.bloco_dados.leituras[3] = 4.0f;
+	envelope.conteudo.bloco_dados.leituras[4] = 5.0f;
+	envelope.conteudo.bloco_dados.leituras[5] = 6.0f;
+	envelope.conteudo.bloco_dados.leituras[6] = 7.0f;
+	envelope.conteudo.bloco_dados.leituras[7] = 8.0f;
+	envelope.conteudo.bloco_dados.leituras[8] = 9.0f;
+	envelope.conteudo.bloco_dados.leituras[9] = 10.0f;
+	envelope.conteudo.bloco_dados.leituras_count = 10;
 
     pb_ostream_t stream = pb_ostream_from_buffer(buffer_protobuf, sizeof(buffer_protobuf));
-    if (pb_encode(&stream, BlocoDados_fields, &mensagem)) {
+    if (pb_encode(&stream, MensagemSerial_fields, &envelope)) {
+        size_t tamanho_protobuf = stream.bytes_written;
+
+        // Codifica com COBS (garante que não haverá 0x00 nos dados)
+        size_t tamanho_cobs = cobs_encode(buffer_protobuf, tamanho_protobuf, buffer_cobs);
+
+        // Adiciona o marcador de fim de pacote
+        buffer_cobs[tamanho_cobs] = 0x00;
+        tamanho_cobs++;
+
+        // Envia pela Serial/UART (Ex: HAL_UART_Transmit, Serial.write...)
+        tud_cdc_send(buffer_cobs, tamanho_cobs, portMAX_DELAY);
+    }
+}
+
+void enviar_climate_data(void) {
+	MensagemSerial envelope = MensagemSerial_init_zero;
+
+	envelope.which_conteudo = MensagemSerial_status_sistema_tag;
+
+	envelope.conteudo.status_sistema.timestamp = xTaskGetTickCount();
+	envelope.conteudo.status_sistema.temperatura = 230;
+	envelope.conteudo.status_sistema.umidade = 34;
+
+    pb_ostream_t stream = pb_ostream_from_buffer(buffer_protobuf, sizeof(buffer_protobuf));
+    if (pb_encode(&stream, MensagemSerial_fields, &envelope)) {
         size_t tamanho_protobuf = stream.bytes_written;
 
         // Codifica com COBS (garante que não haverá 0x00 nos dados)
@@ -178,6 +206,8 @@ void cdc_task(void* params)
 		}
 #endif
 		enviar_dados_massivos(idx++);
+		vTaskDelay(1000);
+		enviar_climate_data();
 		vTaskDelay(1000);
   }
 }

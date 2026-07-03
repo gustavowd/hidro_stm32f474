@@ -6,7 +6,13 @@
 #error Regenerate this file with the current version of nanopb generator.
 #endif
 
+PB_BIND(MensagemSerial, MensagemSerial, 4)
+
+
 PB_BIND(BlocoDados, BlocoDados, 4)
+
+
+PB_BIND(StatusSistema, StatusSistema, AUTO)
 
 
 
