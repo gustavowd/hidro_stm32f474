@@ -13,6 +13,7 @@
 #include "pb_encode.h"
 #include "cobs.h"
 #include "dados.pb.h"
+#include "crc32.h"
 
 SemaphoreHandle_t cdc_tx_sem;
 QueueHandle_t	  cdc_rx_queue;
@@ -110,7 +111,7 @@ uint32_t tud_cdc_receive(uint8_t *buffer, uint32_t bufsize, TickType_t timeout){
 }
 
 // Tamanho do Protobuf (calculado automaticamente pela Nanopb)
-#define BUFFER_PROTOBUF_SIZE   MensagemSerial_size
+#define BUFFER_PROTOBUF_SIZE   MensagemSerial_size + 4
 
 // Tamanho do COBS aplicando a fórmula do pior cenário + 1 byte do 0x00 final
 #define BUFFER_COBS_SIZE       (BUFFER_PROTOBUF_SIZE + (BUFFER_PROTOBUF_SIZE / 254))
@@ -140,6 +141,17 @@ void enviar_dados_massivos(uint32_t idx) {
     if (pb_encode(&stream, MensagemSerial_fields, &envelope)) {
         size_t tamanho_protobuf = stream.bytes_written;
 
+        // Calcula o CRC32 sobre os bytes que o Protobuf acabou de gerar
+        uint32_t crc = crc32_calculate(buffer_protobuf, tamanho_protobuf);
+
+        // Injeta o CRC32 (4 bytes) como LITTLE ENDIAN (Byte menos significativo primeiro)
+        buffer_protobuf[tamanho_protobuf + 0] = (uint8_t)(crc & 0xFF);         // LSB
+		buffer_protobuf[tamanho_protobuf + 1] = (uint8_t)((crc >> 8) & 0xFF);
+		buffer_protobuf[tamanho_protobuf + 2] = (uint8_t)((crc >> 16) & 0xFF);
+		buffer_protobuf[tamanho_protobuf + 3] = (uint8_t)((crc >> 24) & 0xFF); // MSB
+
+		tamanho_protobuf += 4;
+
         // Codifica com COBS (garante que não haverá 0x00 nos dados)
         size_t tamanho_cobs = cobs_encode(buffer_protobuf, tamanho_protobuf, buffer_cobs);
 
@@ -164,6 +176,17 @@ void enviar_climate_data(void) {
     pb_ostream_t stream = pb_ostream_from_buffer(buffer_protobuf, sizeof(buffer_protobuf));
     if (pb_encode(&stream, MensagemSerial_fields, &envelope)) {
         size_t tamanho_protobuf = stream.bytes_written;
+
+        // Calcula o CRC32 sobre os bytes que o Protobuf acabou de gerar
+        uint32_t crc = crc32_calculate(buffer_protobuf, tamanho_protobuf);
+
+        // Injeta o CRC32 (4 bytes) como LITTLE ENDIAN (Byte menos significativo primeiro)
+        buffer_protobuf[tamanho_protobuf + 0] = (uint8_t)(crc & 0xFF);         // LSB
+		buffer_protobuf[tamanho_protobuf + 1] = (uint8_t)((crc >> 8) & 0xFF);
+		buffer_protobuf[tamanho_protobuf + 2] = (uint8_t)((crc >> 16) & 0xFF);
+		buffer_protobuf[tamanho_protobuf + 3] = (uint8_t)((crc >> 24) & 0xFF); // MSB
+
+		tamanho_protobuf += 4;
 
         // Codifica com COBS (garante que não haverá 0x00 nos dados)
         size_t tamanho_cobs = cobs_encode(buffer_protobuf, tamanho_protobuf, buffer_cobs);
